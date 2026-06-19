@@ -1,0 +1,18 @@
+# macOS
+.DS_Store
+
+# SwiftPM 빌드 산출물
+.build/
+*.swiftpm
+Package.resolved
+
+# 조립된 앱 번들 / 배포물 (make-app.sh, make-dmg.sh 가 생성)
+*.app/
+*.dmg
+
+# 아이콘 생성 중간물(최종 .icns 는 Resources/ 에 커밋)
+icon-candidates/*.iconset/
+
+# Xcode (혹시 사용 시)
+*.xcodeproj/xcuserdata/
+DerivedData/

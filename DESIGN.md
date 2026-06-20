@@ -392,8 +392,10 @@ SwiftPM 패키지. `swift build` / `swift test` / `./scripts/make-app.sh && open
 | 스트로크 1회 = Undo 1회 (타일 before/after 델타) | ✅ | `applyPaintTiles` |
 | 새 페인트 레이어(⌘⇧N), 도구 전환(V/B/E), 크기([ ]), 색상(NSColorPanel) | ✅ | `CanvasWindowController`, `AppDelegate` |
 
-> M2a 한계(노트): Metal 스탬프 미적용(CPU, 측정 후 M2b 최적화) · 재열기 시 페인트 레이어는
-> 평탄화되어 재편집 불가 · 가져온 이미지 위 직접 칠하기는 새 페인트 레이어로 대체.
+> M2a 한계(노트): Metal 스탬프 미적용(CPU, 측정 후 M2b 최적화).
+> ~~재열기 시 페인트 레이어 재편집 불가~~ → **해결**(코드 리뷰 반영): 정적 이미지/래스터 레이어에
+> 칠하면 `ResourceStore.convertToPaintCanvas`로 **온디맨드 편집 가능 변환**(`PaintCanvas.loadCGImage`,
+> 방향 왕복 테스트로 증명). 가져온 이미지 위 직접 칠하기도 그 레이어에 바로 적용됨.
 
 ### M2b — 스포이드·채우기·내보내기 (구현, 실기 검증 중)
 | 항목 | 상태 | 위치 |

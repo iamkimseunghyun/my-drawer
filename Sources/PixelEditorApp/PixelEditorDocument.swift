@@ -173,9 +173,11 @@ final class PixelEditorDocument: NSDocument {
 
     /// 선택 레이어가 페인트 레이어면 그 핸들, 아니면 새 페인트 레이어를 만든다.
     private func paintHandle(forLayer id: UUID?) -> TileStoreHandle? {
-        if let id, let node = model.layers.first(where: { $0.id == id }),
-           case .raster(let r) = node, resources.isPaint(r.pixels) {
-            return r.pixels
+        if let id, let node = model.layers.first(where: { $0.id == id }), case .raster(let r) = node {
+            if resources.isPaint(r.pixels) { return r.pixels }
+            // 정적 이미지 레이어(가져온 이미지 / 재오픈된 페인트 레이어) → 편집 가능하게 온디맨드 변환.
+            resources.convertToPaintCanvas(r.pixels)
+            if resources.isPaint(r.pixels) { return r.pixels }
         }
         return createPaintLayer()
     }

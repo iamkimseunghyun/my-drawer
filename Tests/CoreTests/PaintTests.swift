@@ -69,6 +69,44 @@ final class PaintTests: XCTestCase {
         XCTAssertEqual(render(cg), render(out), "writeCoverage→makeCGImage 는 원본과 동일(방향 보존)")
     }
 
+    func testLoadCGImageRoundTripsOrientation() {
+        // 정적 이미지 → 페인트 캔버스 변환이 시각적으로 투명해야: load → makeCGImage 가 원본과 동일.
+        // (방향 틀리면 변환 시 레이어가 상하 뒤집힘.) 비대칭 패턴(위 흰/아래 검정)으로 검증.
+        let cs = CGColorSpace(name: CGColorSpace.sRGB)!
+        let info = CGImageAlphaInfo.premultipliedLast.rawValue | CGBitmapInfo.byteOrder32Big.rawValue
+        func render(_ cg: CGImage) -> [UInt8] {
+            var buf = [UInt8](repeating: 0, count: 8 * 8 * 4)
+            buf.withUnsafeMutableBytes {
+                let ctx = CGContext(data: $0.baseAddress, width: 8, height: 8, bitsPerComponent: 8,
+                                    bytesPerRow: 32, space: cs, bitmapInfo: info)!
+                ctx.draw(cg, in: CGRect(x: 0, y: 0, width: 8, height: 8))
+            }
+            return buf
+        }
+        let sctx = CGContext(data: nil, width: 8, height: 8, bitsPerComponent: 8, bytesPerRow: 32,
+                             space: cs, bitmapInfo: info)!
+        sctx.setFillColor(CGColor(gray: 0, alpha: 1)); sctx.fill(CGRect(x: 0, y: 0, width: 8, height: 8))
+        sctx.setFillColor(CGColor(gray: 1, alpha: 1)); sctx.fill(CGRect(x: 0, y: 4, width: 8, height: 4))
+        let cg = sctx.makeImage()!
+
+        let pc = PaintCanvas(width: 8, height: 8)
+        pc.loadCGImage(cg)
+        guard let out = pc.makeCGImage() else { return XCTFail("makeCGImage nil") }
+        XCTAssertEqual(render(cg), render(out), "loadCGImage→makeCGImage 는 원본과 동일(변환 투명·방향 보존)")
+    }
+
+    func testFloodFillFillsRegionAndStopsAtBarrier() {
+        // ④ 최적화 후에도 정확성 유지: 연결 영역만 채우고 다른 색 벽 너머는 안 채움.
+        let c = PaintCanvas(width: 10, height: 1, tileSize: 16)
+        c.beginStroke()
+        c.stampDab(cx: 5, cy: 0, radius: 1.2, hardness: 1, color: RGBA8(255, 0, 0, 255), flow: 1, erase: false) // x≈4~5 벽(빨강)
+        c.floodFill(startX: 0, startY: 0, color: RGBA8(0, 255, 0, 255), tolerance: 0)   // 투명 영역만 채움
+        _ = c.endStroke()
+        XCTAssertEqual(c.pixels[(0 * 4) + 1], 255, "시작쪽 초록 채워짐")
+        XCTAssertEqual(c.pixels[(9 * 4) + 1], 0, "벽 너머(x9)는 안 채워짐(빨강 벽이 막음)")
+        XCTAssertEqual(c.pixels[(9 * 4) + 0], 0, "벽 너머는 투명 유지")
+    }
+
     func testBrushSpacingControlsDabDensity() {
         let a = SIMD2<Double>(0, 0), b = SIMD2<Double>(100, 0)
         let tight = StrokeSampler.dabCenters(from: a, to: b, spacing: 20 * 0.1)   // radius20, 간격0.1 → 2px

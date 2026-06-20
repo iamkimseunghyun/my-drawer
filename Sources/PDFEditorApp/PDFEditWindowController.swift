@@ -156,9 +156,18 @@ final class PDFEditWindowController: NSWindowController {
 
     func refresh() {
         let target = currentIndex
-        pdfView.document = doc.pdf            // 동일 객체 재설정 → 레이아웃 갱신
+        let scale = pdfView.scaleFactor, autoS = pdfView.autoScales
+        // 같은 PDFDocument 객체 재할당은 PDFKit이 무시 → 페이지 순서 변경(exchangePage)이 본문에 반영
+        // 안 됨(페이지 수 안 바뀌어 재레이아웃 트리거 없음). nil로 비웠다가 재할당해 강제 리로드.
+        pdfView.document = nil
+        pdfView.document = doc.pdf
         thumbnails.pdfView = pdfView
-        goTo(min(target, doc.pageCount - 1))
+        pdfView.autoScales = autoS
+        if !autoS { pdfView.scaleFactor = scale }
+        // 문서 재할당 후 PDFView 레이아웃은 비동기 → 같은 런루프에서 go(to:) 하면 무시돼 1페이지로 튐.
+        // 다음 런루프로 미뤄 재배치된(이동된) 페이지로 이동.
+        let dest = min(target, doc.pageCount - 1)
+        DispatchQueue.main.async { [weak self] in self?.goTo(dest) }
     }
     private func goTo(_ i: Int) {
         guard i >= 0, i < doc.pageCount, let page = doc.pdf.page(at: i) else { return }
@@ -200,8 +209,8 @@ final class PDFEditWindowController: NSWindowController {
     // MARK: 액션
     @objc func deletePage() { let i = currentIndex; doc.deletePage(at: i); goTo(min(i, doc.pageCount - 1)) }
     @objc func rotatePage() { doc.rotatePage(at: currentIndex, by: 90) }
-    @objc func movePageUp() { let i = currentIndex; doc.movePage(from: i, to: i - 1); goTo(i - 1) }
-    @objc func movePageDown() { let i = currentIndex; doc.movePage(from: i, to: i + 1); goTo(i + 1) }
+    @objc func movePageUp() { let i = currentIndex; doc.movePage(from: i, to: i - 1) }
+    @objc func movePageDown() { let i = currentIndex; doc.movePage(from: i, to: i + 1) }
 
     @objc func insertImage() {
         let panel = NSOpenPanel(); panel.allowsMultipleSelection = false

@@ -25,6 +25,16 @@ final class ResourceStore {
     func paintCanvas(_ handle: TileStoreHandle) -> PaintCanvas? { paints[handle] }
     func isPaint(_ handle: TileStoreHandle) -> Bool { paints[handle] != nil }
 
+    /// 정적 이미지 핸들을 편집 가능 페인트 캔버스로 변환(같은 핸들 유지). 재오픈된 페인트 레이어 재편집용.
+    func convertToPaintCanvas(_ handle: TileStoreHandle) {
+        guard let cg = images[handle] else { return }
+        let pc = PaintCanvas(width: cg.width, height: cg.height)
+        pc.loadCGImage(cg)
+        paints[handle] = pc
+        images[handle] = nil
+        ciCache[handle] = nil
+    }
+
     /// 레이어 마스크 캔버스(불투명 흰색 = 전부 보임). 마스크도 paint canvas라 브러시로 칠한다.
     func createMaskCanvas(_ handle: TileStoreHandle, width: Int, height: Int) {
         let pc = PaintCanvas(width: width, height: height)

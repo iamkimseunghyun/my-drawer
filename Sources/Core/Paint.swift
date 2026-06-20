@@ -97,16 +97,21 @@ public final class PaintCanvas {
         let repl = RGBA8(color.r, color.g, color.b, 255)        // 불투명 = premult 그대로
         if matches(target, repl, 0) { return }                  // 같은 색이면 무한루프 방지
         var stack: [(Int, Int)] = [(startX, startY)]
+        // 스택에 넣기 전 경계·색 일치를 미리 검사 → 대형 채우기에서 중복 push/pop 절감(CodeRabbit/Gemini 리뷰).
+        // pop 시점 재검사는 같은 픽셀이 여러 이웃에서 push될 수 있어 여전히 필요(이미 채움이면 skip).
+        func enqueueIfFillable(_ x: Int, _ y: Int) {
+            guard x >= 0, y >= 0, x < width, y < height else { return }
+            let c = pixelRGBA(x, y)
+            if matches(c, target, tolerance), !matches(c, repl, 0) { stack.append((x, y)) }
+        }
         while let (x, y) = stack.popLast() {
-            if x < 0 || y < 0 || x >= width || y >= height { continue }
             let cur = pixelRGBA(x, y)
-            if !matches(cur, target, tolerance) { continue }
-            if matches(cur, repl, 0) { continue }               // 이미 채움 → 재방문 차단
+            if !matches(cur, target, tolerance) || matches(cur, repl, 0) { continue }   // 이미 채움/불일치
             captureTile(forX: x, y: y)
             let i = (y * width + x) * 4
             pixels[i] = repl.r; pixels[i + 1] = repl.g; pixels[i + 2] = repl.b; pixels[i + 3] = 255
-            stack.append((x + 1, y)); stack.append((x - 1, y))
-            stack.append((x, y + 1)); stack.append((x, y - 1))
+            enqueueIfFillable(x + 1, y); enqueueIfFillable(x - 1, y)
+            enqueueIfFillable(x, y + 1); enqueueIfFillable(x, y - 1)
         }
     }
 
@@ -169,6 +174,19 @@ public final class PaintCanvas {
     public func restore(_ tiles: [TileIndex: [UInt8]]) {
         for (idx, bytes) in tiles { writeTile(idx, bytes) }
     }
+    /// CGImage를 버퍼에 로드(캔버스 크기로 그림). 정적 이미지 레이어 → 편집 가능 페인트 캔버스 변환용.
+    /// makeCGImage와 같은 컨텍스트 규약이라 makeCGImage()로 원본을 그대로 복원(방향 보존, 테스트로 증명).
+    public func loadCGImage(_ cg: CGImage) {
+        guard let cs = CGColorSpace(name: CGColorSpace.sRGB) else { return }
+        let info = CGImageAlphaInfo.premultipliedLast.rawValue | CGBitmapInfo.byteOrder32Big.rawValue
+        pixels.withUnsafeMutableBytes { raw in
+            guard let base = raw.baseAddress,
+                  let ctx = CGContext(data: base, width: width, height: height, bitsPerComponent: 8,
+                                      bytesPerRow: width * 4, space: cs, bitmapInfo: info) else { return }
+            ctx.draw(cg, in: CGRect(x: 0, y: 0, width: width, height: height))
+        }
+    }
+
     /// 커버리지 CGImage(흰=보임)를 불투명 그레이스케일로 버퍼에 그린다(캔버스 크기로 스케일).
     /// 배경 지우기: Vision 전경 마스크 → 마스크 캔버스. makeCGImage와 같은 컨텍스트 규약이라 방향 정합.
     /// beginStroke/endStroke 사이에 호출하면 undo 델타로 잡힌다.

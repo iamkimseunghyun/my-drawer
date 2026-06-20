@@ -1,0 +1,9 @@
+# CodeRabbit 설정 — https://docs.coderabbit.ai/getting-started/configure-coderabbit
+# yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
+language: "ko-KR"          # 리뷰 코멘트 언어
+reviews:
+  profile: "assertive"     # CHILL→ASSERTIVE: nit·제안성 코멘트까지 더 깐깐하게
+  request_changes_workflow: false
+  high_level_summary: true
+  auto_review:
+    enabled: true          # PR push 시 자동 incremental 리뷰

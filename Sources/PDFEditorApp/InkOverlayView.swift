@@ -35,10 +35,14 @@ final class InkOverlayView: NSView {
     override func hitTest(_ point: NSPoint) -> NSView? {
         if signing || whiteoutMode { return self }
         guard let pdfView else { return nil }
-        if let s = selected, let pg = selectedPage, handleFixedCorner(of: s, page: pg, atViewPoint: point) != nil {
+        // hitTest 의 point 는 superview 좌표계. 핸들/page(for:)/editable 은 pdfView 좌표를 기대하므로
+        // 변환 필수. 현재 레이아웃은 오버레이·pdfView 가 같은 컨테이너에 동일 프레임이라 좌표가 우연히
+        // 일치하지만, 레이아웃이 어긋나면 조용히 깨짐 → 명시 변환으로 좌표계 안전성 확보(리뷰 반영).
+        let vp = superview.map { pdfView.convert(point, from: $0) } ?? point
+        if let s = selected, let pg = selectedPage, handleFixedCorner(of: s, page: pg, atViewPoint: vp) != nil {
             return self
         }
-        if let page = pdfView.page(for: point, nearest: true), editable(at: point, on: page) != nil { return self }
+        if let page = pdfView.page(for: vp, nearest: true), editable(at: vp, on: page) != nil { return self }
         return nil
     }
 

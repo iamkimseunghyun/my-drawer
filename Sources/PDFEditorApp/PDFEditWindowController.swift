@@ -164,14 +164,13 @@ final class PDFEditWindowController: NSWindowController {
         thumbnails.pdfView = pdfView
         pdfView.autoScales = autoS
         if !autoS { pdfView.scaleFactor = scale }
-        // 문서 재할당 후 PDFView 레이아웃은 비동기 → 같은 런루프에서 go(to:) 하면 무시돼 1페이지로 튐.
-        // 다음 런루프로 미뤄 재배치된(이동된) 페이지로 이동.
-        let dest = min(target, doc.pageCount - 1)
-        DispatchQueue.main.async { [weak self] in self?.goTo(dest) }
+        goTo(min(target, doc.pageCount - 1))
     }
     private func goTo(_ i: Int) {
         guard i >= 0, i < doc.pageCount, let page = doc.pdf.page(at: i) else { return }
-        pdfView.go(to: page)
+        // 문서 재할당(refresh) 직후 PDFView 레이아웃은 비동기 → 같은 런루프의 go(to:)는 무시돼 1페이지로 튐.
+        // 다음 런루프로 미뤄, 모든 호출처(refresh·삭제·삽입·순서이동)가 일관되게 올바른 페이지로 이동.
+        DispatchQueue.main.async { [weak self] in self?.pdfView.go(to: page) }
     }
 
     /// 이동/리사이즈 등 bounds 변경 — 가벼운 갱신(즉시 반영됨).
